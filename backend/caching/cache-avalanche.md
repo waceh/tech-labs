@@ -10,23 +10,23 @@
 
 이 문서에서 Cache Avalanche는 다수 Key가 동시에 miss 상태가 되어 원본에 부하가 집중되는 현상입니다. 동시 TTL 만료, 캐시 계층 장애, 대량 eviction/유실, 배포 후 cold start가 계기가 될 수 있습니다. Redis 오류와 정상적인 cache miss는 구분해서 관측해야 합니다.
 
-| 구분 | Stampede | Avalanche |
+| 구분 | [Stampede](cache-stampede.md) | Avalanche |
 |---|---|---|
 | 주요 범위 | 같은 Key의 중복 재생성 | 다수 Key의 원본 조회 집중 |
-| 우선 대응 | Key별 Single Flight, 갱신 제어 | 원본 예산, admission control, 점진 Warm-up |
+| 우선 대응 | Key별 [Single Flight](single-flight.md), 갱신 제어 | 원본 예산, admission control, 점진 Warm-up |
 | TTL jitter | Hot Key 중복을 직접 억제하지 않음 | 여러 Key의 동시 만료를 분산 |
 
 두 현상은 함께 발생할 수 있습니다. 서로 다른 10만 Key의 miss는 Single Flight만으로 합칠 수 없습니다.
 
 ## 면접 답변 예시
 
-> 대량 miss 상황에서는 캐시를 빨리 채우는 것보다 원본을 먼저 보호하겠습니다. 남아 있는 L1을 활용하고 동일 Key의 중복은 합치되, 서로 다른 Key의 조회는 Bulkhead와 제한된 대기 또는 빠른 거절로 제어하겠습니다. Redis 장애라면 짧은 timeout과 Circuit Breaker로 반복 대기를 줄이겠습니다. 복구 후에는 hot set부터 낮은 우선순위로 Warm-up하며 foreground와 합산한 DB 예산 안에서 처리하겠습니다. Redis 연결 성공만으로 제한을 해제하지 않고 hit ratio, DB 지연과 풀 대기, API 오류율을 보며 점진적으로 회복하겠습니다.
+> Cache Avalanche는 다수 Key의 miss가 겹쳐 원본 부하가 집중되는 현상입니다. 대응의 우선순위는 원본 용량 보호입니다. 유효한 로컬 캐시와 동일 Key 요청 병합을 활용하고, 서로 다른 Key의 조회는 동시성 제한과 제한된 대기 또는 빠른 거절로 제어합니다. 캐시 의존성 장애에는 timeout과 [Circuit Breaker](../resilience/circuit-breaker.md)가 반복 대기를 줄일 수 있지만 원본 fallback 부하는 별도로 제한해야 합니다. 복구 시에는 hot set부터 낮은 우선순위로 Warm-up하며 사용자 요청과 합산한 원본 예산을 지킵니다. 연결 성공뿐 아니라 캐시 적중률, 원본 지연과 풀 대기, API 오류율을 확인하며 점진적으로 회복합니다.
 
-## 실무 적용과 경력 연결
+## 실무 적용과 설계 판단 기준
 
 배치가 많은 상품 Key에 동일 TTL을 설정했다면 만료 시점에 jitter를 주고 적재 시작 시점도 분산합니다. 캐시 장애에는 jitter가 효과가 없으므로 원본 부하 제어를 별도로 설계합니다.
 
-Redis 장애 대응 경험에서는 “Redis가 복구됐다”와 “사용자 요청이 정상화됐다”의 시간을 구분해 설명합니다. 실제 데이터 유실 여부는 영속성, 복제와 failover 구성으로 확인합니다. Redis 재시작을 전량 유실과 동일시하지 않습니다.
+[장애 복구](../resilience/redis-recovery.md) 평가는 “캐시 연결이 복구됐다”와 “사용자 요청이 정상화됐다”의 시점을 구분합니다. 실제 데이터 유실 여부는 영속성, 복제와 failover 구성으로 확인합니다. Redis 재시작을 전량 유실과 동일시하지 않습니다.
 
 ## 예상 꼬리 질문과 답변
 
@@ -42,10 +42,11 @@ Redis 장애 대응 경험에서는 “Redis가 복구됐다”와 “사용자 
 
 무제한 DB fallback과 무제한 대기 큐는 장애를 원본과 애플리케이션으로 전파합니다. “TTL을 랜덤하게 설정한다”는 예방 답변만으로 캐시 계층 장애를 설명할 수 없습니다. cache hit ratio 단독으로 복구를 판단하지 말고 API tail latency와 원본 포화 지표를 함께 봅니다.
 
-운영 경험 답변에는 실제 유실 범위, 부하 제한 방식, 회복 판단 기준을 보완합니다. 임의의 permit 수나 hit ratio를 보편적 정답처럼 제시하지 않습니다.
+설계 평가에는 데이터 유실 범위, 부하 제한 방식과 회복 판단 기준이 필요합니다. 임의의 permit 수나 hit ratio를 보편적 정답처럼 제시하지 않습니다.
 
 ## 관련 문서 / 참고 자료
 
+- [Circuit Breaker와 장애 감지·Slack 알림](../resilience/circuit-breaker.md): 정상 miss와 장애의 구분, 차단 후 원본 보호와 운영 알림
 - [Cache Stampede](cache-stampede.md), [Redis 장애 복구와 Graceful Degradation](../resilience/redis-recovery.md)
 - [Redis persistence 공식 문서](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/): 복구와 데이터 보존
 

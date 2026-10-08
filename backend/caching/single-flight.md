@@ -28,15 +28,15 @@ C: 작업 완료 이후 도착 → 캐시 hit 또는 새 작업
 
 ## 면접 답변 예시
 
-> Single Flight는 같은 Key의 진행 중인 작업을 공유합니다. 첫 요청이 Future를 원자적으로 등록하고 원본 조회를 시작하며, 후속 요청은 기존 Future의 결과를 기다립니다. 시간 창으로 요청을 모으는 batching과 다르고, 완료 결과를 보관하는 캐시와도 책임이 다릅니다. 로컬 Map이라면 해당 객체 범위에서만 합쳐지므로 여러 인스턴스에서 전역 한 번을 보장하지 않습니다. 운영에서는 요청별 대기 timeout과 원본 I/O deadline을 분리하고, 공유 Future에 한 요청의 취소가 전파되지 않도록 하겠습니다. 서로 다른 Key의 부하는 별도 원본 동시성 제한으로 제어하겠습니다.
+> Single Flight는 동일 Key의 진행 중인 작업을 공유하는 패턴입니다. 첫 요청이 작업을 원자적으로 등록해 leader가 되고 후속 요청은 해당 작업의 결과나 실패를 기다립니다. 시간 창으로 요청을 수집하는 batching과 다르며, 완료 결과의 재사용은 캐시의 책임입니다. 로컬 coordinator는 해당 객체 범위에서만 동작하므로 여러 인스턴스에서 전역 한 번을 보장하지 않습니다. 요청별 대기 timeout과 원본 I/O deadline을 분리하고 한 요청의 취소가 공유 작업이나 다른 follower에 전파되지 않도록 해야 합니다. [다수 Key의 miss](cache-avalanche.md)에 따른 부하는 별도 원본 동시성 제한이 필요합니다.
 
-## 실무 적용과 경력 연결
+## 실무 적용과 설계 판단 기준
 
-커머스 상품 캐시 miss, 외부 API 조회처럼 같은 Key의 결과가 동등하고 중복 읽기 비용이 큰 경로에 적합합니다. 캐시 확인 후 leader 선출 사이에 다른 작업이 값을 채울 수 있으므로 leader 안에서 캐시를 재확인합니다.
+[Cache Stampede](cache-stampede.md)가 발생하는 캐시 miss나 외부 API 조회처럼 같은 Key의 결과가 동등하고 중복 읽기 비용이 큰 경로에 적합합니다. 캐시 확인 후 leader 선출 사이에 다른 작업이 값을 채울 수 있으므로 leader 안에서 캐시를 재확인합니다.
 
 Key는 결과의 동등성 계약입니다. tenant, 권한, locale, projection이 다르면 상품 ID만으로 합쳐서는 안 됩니다. loader가 부작용을 포함하거나 호출자별 다른 결과를 반환하면 적용 조건을 다시 검토합니다.
 
-본인의 운영 경험에 연결할 때 실제 사용한 라이브러리/구현과 검증 범위를 설명합니다. 아래 보조 예제는 학습용이며 개인의 과거 운영 도입 경험을 증명하지 않습니다.
+구현 선택은 공유 범위, 실패 전달, 취소 격리와 자원 한도를 기준으로 평가합니다. 아래 Java 보조 예제는 로컬 동작을 보여주는 구현 사례이며 패턴 자체가 특정 언어나 라이브러리에 한정되는 것은 아닙니다.
 
 ## 예상 꼬리 질문과 답변
 
@@ -44,11 +44,11 @@ Key는 결과의 동등성 계약입니다. tenant, 권한, locale, projection�
 
 **한 follower가 취소하면요?** 공유 Future를 직접 timeout/cancel하면 다른 요청에도 영향을 줄 수 있습니다. 요청별 파생 Future나 `copy()`에 대기 timeout을 적용하고 원본 작업 생명주기를 별도로 관리합니다.
 
-**실패하면 다시 실행하나요?** 현재 follower는 실패를 공유합니다. 정리 후 새 요청은 재시도할 수 있으므로 backoff, retry budget, Circuit Breaker 없이는 반복 부하가 생깁니다.
+**실패하면 다시 실행하나요?** 현재 follower는 실패를 공유합니다. 정리 후 새 요청은 재시도할 수 있으므로 backoff, retry budget, [Circuit Breaker](../resilience/circuit-breaker.md) 없이는 반복 부하가 생깁니다.
 
 **왜 `remove(key, future)`인가요?** 이전 작업의 정리가 새 작업의 항목을 삭제하지 않도록 identity를 확인합니다. 성공, 실패와 Executor 제출 거절 모두에서 정리가 필요합니다. 종료 전 강제 삭제하면 기존 원본과 새 작업이 겹칠 수 있습니다.
 
-**Caffeine이면 직접 구현해야 하나요?** 같은 캐시의 로딩만 제어한다면 `cache.get(key, mappingFunction)`의 원자적 로딩이나 AsyncLoadingCache를 먼저 검토합니다. 여러 계층/캐시 외 작업을 조정해야 할 때 별도 coordinator의 필요성을 판단합니다.
+**[Caffeine](multi-level-cache.md)이면 직접 구현해야 하나요?** 같은 캐시의 로딩만 제어한다면 `cache.get(key, mappingFunction)`의 원자적 로딩이나 AsyncLoadingCache를 먼저 검토합니다. 여러 계층/캐시 외 작업을 조정해야 할 때 별도 coordinator의 필요성을 판단합니다.
 
 **Redis 락과 무엇이 다른가요?** 로컬 Future는 결과를 전달합니다. Redis 락은 인스턴스 간 선출 수단이며 결과 전달과 미획득 요청 처리, lease 만료·늦은 쓰기는 별도 설계해야 합니다.
 

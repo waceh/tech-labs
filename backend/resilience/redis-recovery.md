@@ -12,18 +12,24 @@ Graceful Degradation은 핵심 기능과 자원 예산을 보호하며 일부 �
 
 | 수단 | 목적 | 단독 적용의 한계 |
 |---|---|---|
-| 짧은 timeout / Circuit Breaker | Redis 반복 대기·호출을 줄임 | DB fallback 부하를 제한하지 않음 |
-| L1 / 제한된 stale | 원본 접근을 줄이고 일부 응답 유지 | freshness·데이터별 허용 기준 필요 |
-| Single Flight | 동일 Key 중복 원본 조회 억제 | 다른 Key / 다른 인스턴스는 별도 |
+| 짧은 timeout / [Circuit Breaker](circuit-breaker.md) | Redis 반복 대기·호출을 줄임 | DB fallback 부하를 제한하지 않음 |
+| [L1](../caching/multi-level-cache.md) / 제한된 stale | 원본 접근을 줄이고 일부 응답 유지 | freshness·데이터별 허용 기준 필요 |
+| [Single Flight](../caching/single-flight.md) | 동일 Key 중복 원본 조회 억제 | 다른 Key / 다른 인스턴스는 별도 |
 | Bulkhead | 원본 작업 자원을 분리·제한 | 무한 대기 큐를 허용하면 대기 부하 누적 |
 | Load Shedding | 감당하지 못하는 작업을 빠르게 거절 | 거절 대상과 사용자 응답 정책 필요 |
 | Warm-up | 복구 후 중요한 캐시부터 채움 | foreground와 원본 용량 경쟁 |
 
 ## 면접 답변 예시
 
-> Redis 장애에서는 정상 miss와 timeout을 구분하고 짧은 timeout과 Circuit Breaker로 대기 누적을 줄이겠습니다. 남아 있는 L1을 활용하고 같은 Key는 Single Flight로 합치되, 다른 Key의 DB fallback은 원본 동시성 한도로 제어하겠습니다. 상품 설명이나 추천은 합의된 최대 stale age 또는 기능 축소를 적용할 수 있지만 재고·결제·권한은 별도 검증하거나 실패를 명시하겠습니다. Redis 복구 후에는 데이터 보존 범위와 hot set의 hit ratio를 확인하고, 낮은 우선순위 Warm-up과 foreground를 전체 DB 예산 안에서 운영하겠습니다. DB 지연, 풀 대기, API P99와 오류율을 보며 트래픽 제한을 점진적으로 해제하겠습니다.
+> 재생성 가능한 캐시의 장애에서는 정상 miss와 접근 실패를 구분하고 timeout과 Circuit Breaker로 반복 대기를 줄입니다. 유효한 로컬 캐시를 활용하고 동일 Key 조회는 병합하되, 다른 Key의 원본 fallback은 동시성 한도로 제어해야 합니다. stale 응답이나 기능 축소는 업무상 허용된 범위에서 적용하며 재고·결제·권한은 별도 검증하거나 명시적으로 실패해야 합니다. 복구 후에는 데이터 보존 범위와 hot set의 적중률을 확인하고 Warm-up과 사용자 요청을 전체 원본 예산 안에서 처리합니다. 원본 지연, 풀 대기, API tail latency와 오류율을 확인하며 트래픽 제한을 점진적으로 해제합니다.
 
-## 실무 적용과 경력 연결
+## 실무 적용과 설계 판단 기준
+
+### 장애 감지와 운영 알림
+
+Redis GET 성공 후 값이 없는 정상 miss와 timeout·연결 오류를 구분합니다. 성공한 호출도 느려질 수 있으므로 실패율뿐 아니라 호출 지연과 slow call 비율을 관측합니다. 서킷 발동은 최소 표본과 관측 구간을 기준으로 판단하고, OPEN에서는 Redis를 반복 호출하지 않은 채 아래 원본 보호와 fallback 정책을 적용합니다.
+
+서킷 상태·차단 호출·fallback 비율과 API/DB 영향 지표를 수집하고, Prometheus → Alertmanager → Slack으로 지속 장애와 사용자 영향을 알립니다. 상태 전환 로그를 함께 남기고 서비스·환경·의존성별로 알림을 묶습니다. HALF_OPEN 전환이나 알림 resolved만으로 전체 서비스 복구를 선언하지 않습니다. 감지 시나리오, 요청 흐름과 설정 예시는 [Circuit Breaker 문서](circuit-breaker.md)를 참고합니다.
 
 ### 장애 중
 
@@ -40,7 +46,7 @@ Graceful Degradation은 핵심 기능과 자원 예산을 보호하며 일부 �
 - Circuit Breaker half-open probe와 정상 트래픽을 제한적으로 확대합니다. 연결 성공만으로 전량 복귀하지 않습니다.
 - TTL jitter와 갱신 분산으로 재발을 줄이고 장애 타임라인과 회복 판단을 기록합니다.
 
-본인의 Redis 장애 대응 경험을 답변에 넣을 때는 **증상 → 확인한 원인 → 본인 조치와 선택 근거 → 관측 결과 → 남은 문제**로 설명합니다. 현재 제공된 정보로는 당시 원인, 수치, Warm-up/Bulkhead 적용 여부를 알 수 없으므로 실제 기록으로 보완합니다.
+장애 대응의 타당성은 **관측 증상 → 원인 확인 → 보호 조치와 선택 근거 → 측정 결과 → 남은 위험**으로 평가합니다. 연결 실패, 데이터 유실, 원본 포화는 서로 다른 현상이므로 각각의 근거를 확인해야 합니다.
 
 ## 예상 꼬리 질문과 답변
 
@@ -66,6 +72,7 @@ cache-aside에서는 DB 갱신 전 시작한 조회가 무효화 후 오래된 �
 
 ## 관련 문서 / 공식 참고 자료
 
+- [Circuit Breaker: 장애 감지, 요청 처리와 Slack 알림](circuit-breaker.md)
 - [Cache Avalanche](../caching/cache-avalanche.md), [Caffeine / Redis](../caching/multi-level-cache.md), [Single Flight](../caching/single-flight.md)
 - [Redis persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/)
 - [Redis distributed locks](https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/)
