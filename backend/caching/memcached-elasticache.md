@@ -8,7 +8,7 @@
 
 ## 핵심 개념
 
-### Q1. Memcached란 무엇인가요?
+### Memcached란 무엇인가요?
 
 Memcached는 별도 프로세스로 실행되는 오픈소스 인메모리 Key-Value 캐시입니다. 애플리케이션의 JVM Heap이 아니라 Memcached 프로세스에 할당된 RAM을 사용합니다. 캐시 서버 자체를 실행하는 데 MySQL 등 별도 데이터베이스는 필요하지 않습니다. 업무의 원본 데이터는 별도 저장소에 두는 것이 일반적입니다. [Memcached 공식 문서](https://docs.memcached.org/)
 
@@ -18,7 +18,7 @@ Spring Boot → Memcached Client → Network → Memcached Server → RAM
 
 기본 사용 모델은 휘발성 캐시이며 일반적인 DB처럼 디스크 영속성을 전제로 하지 않습니다. Warm Restart 등 특수 기능이 있더라도 장애 시 원본에서 재생성 가능한 캐시라는 설계 원칙을 유지합니다. [Memcached FAQ](https://docs.memcached.org/userguide/faq/), [Warm Restart](https://docs.memcached.org/features/restart/)
 
-### Q2. set과 get은 무엇을 하나요?
+### set과 get은 무엇을 하나요?
 
 ```python
 # 특정 라이브러리의 실행 코드가 아닌 개념적 예시
@@ -30,7 +30,7 @@ cache.get('myKey')
 
 Memcached 프로토콜의 expiration은 0이면 만료 시간 없음, 30일 이하면 상대 초, 30일을 초과하면 Unix timestamp로 해석됩니다. “만료 없음”이어도 메모리 압박이나 장애로 값이 사라질 수 있습니다. [Basic Protocol](https://docs.memcached.org/protocols/basic/)
 
-### Q3. 로컬 캐시와 분산 캐시는 어떻게 다른가요?
+### 로컬 캐시와 분산 캐시는 어떻게 다른가요?
 
 | 구분 | 로컬 캐시(Caffeine 등) | 공유 캐시(Memcached, Redis 등) |
 |---|---|---|
@@ -41,7 +41,7 @@ Memcached 프로토콜의 expiration은 0이면 만료 시간 없음, 30일 이�
 
 여러 애플리케이션이 하나의 클러스터를 이용해도 모든 노드가 모든 데이터를 복제하는 것은 아닙니다. L1과 L2를 함께 사용하면 [다단계 캐시의 freshness와 무효화](multi-level-cache.md)를 설계해야 합니다.
 
-### Q4. Memcached와 Redis는 어떻게 다른가요?
+### Memcached와 Redis는 어떻게 다른가요?
 
 | 구분 | 일반적인 Memcached 엔진 | Redis OSS 엔진 |
 |---|---|---|
@@ -54,11 +54,11 @@ Memcached 프로토콜의 expiration은 0이면 만료 시간 없음, 30일 이�
 
 표는 엔진의 일반 기능 비교입니다. 관리형 서비스가 모든 엔진 옵션을 그대로 제공한다는 뜻은 아니며 실제 배포의 지원 기능을 확인해야 합니다. Redis의 영속성·복제도 설정과 실패 조건에 따라 데이터 손실 가능성이 달라집니다. [Redis 자료구조](https://redis.io/docs/latest/develop/data-types/), [영속성](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/), [복제](https://redis.io/docs/latest/operate/oss_and_stack/management/replication/)
 
-### Q5. AWS에서도 Memcached를 사용할 수 있나요?
+### AWS에서도 Memcached를 사용할 수 있나요?
 
 Amazon ElastiCache는 Memcached, Redis OSS와 Valkey 엔진을 지원하는 관리형 서비스입니다. **ElastiCache for Memcached**를 사용할 수 있으며 노드 기반과 Serverless 배포를 구분해야 합니다. [AWS ElastiCache 개요](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html)
 
-### Q6. ElastiCache for Memcached는 데이터를 어떻게 분산하나요?
+### ElastiCache for Memcached는 데이터를 어떻게 분산하나요?
 
 일반적인 노드 기반 클러스터에서는 클라이언트가 Key를 노드에 매핑해 해당 노드로 요청합니다. 클라이언트의 consistent hashing 지원과 노드 목록 갱신 정책을 확인합니다.
 
@@ -81,23 +81,25 @@ Serverless는 TLS를 지원하는 클라이언트가 필요하며 노드 기반�
 
 ## 면접 답변 예시
 
-> Memcached는 별도 프로세스의 RAM에 Key-Value 데이터를 저장하는 캐시이며 애플리케이션 로컬 Heap과 구분됩니다. 일반적인 노드 기반 구성은 클라이언트가 Key별 노드를 선택하고 노드 간 기본 복제를 제공하지 않습니다. AWS에서는 ElastiCache for Memcached를 사용할 수 있으며 Auto Discovery는 노드 구성 발견을 돕습니다. Serverless는 AWS가 관리하는 복제된 Multi-AZ 구조이므로 별도로 설명해야 합니다. 선택은 필요한 자료구조, 장애 허용 범위와 비용으로 판단하고 캐시 miss나 장애 시 원본 부하를 제한하는 설계가 필요합니다.
+> Memcached는 별도 프로세스의 RAM에 Key-Value 데이터를 저장하는 캐시이며 애플리케이션 로컬 Heap과 구분됩니다. 일반적인 노드 기반 구성은 클라이언트가 Key별 노드를 선택하고 노드 간 기본 복제를 제공하지 않습니다.
+
+추가 설명: AWS에서는 ElastiCache for Memcached를 사용할 수 있으며 Auto Discovery는 노드 구성 발견을 돕습니다. Serverless는 AWS가 관리하는 복제된 Multi-AZ 구조이므로 별도로 설명해야 합니다. 선택은 필요한 자료구조, 장애 허용 범위와 비용으로 판단하고 캐시 miss나 장애 시 원본 부하를 제한하는 설계가 필요합니다.
 
 ## 실무 적용과 설계 판단 기준
 
-### Q7. Memcached 장애와 Cache Miss는 어떻게 처리하나요?
+### Memcached 장애와 Cache Miss는 어떻게 처리하나요?
 
 기본 Cache-aside 흐름은 캐시 조회 → 정상 miss이면 원본 조회 → 캐시 저장과 응답입니다. 실제 호출 실패는 정상 miss와 별도 기록하고 요청 deadline 안에서 fallback 가능 여부를 판단합니다.
 
 - 동일 Key의 중첩 miss는 [Cache Stampede](cache-stampede.md)이며 [Single Flight](single-flight.md) 등으로 중복 로딩을 줄일 수 있습니다.
 - 노드 유실·대량 만료로 여러 Key가 miss이면 [Cache Avalanche](cache-avalanche.md) 관점으로 전체 원본 동시성과 처리 예산을 제한합니다.
 - timeout·연결 오류에는 [Circuit Breaker](../resilience/circuit-breaker.md)를 적용할 수 있습니다. 노드별 장애와 클러스터 전체 장애를 구분해 차단 범위를 정합니다.
-- 유효한 L1과 허용된 stale, 제한된 원본 fallback, 기능 축소/빠른 실패 정책을 선택합니다. [Graceful Degradation](../resilience/redis-recovery.md)의 원본 보호 원칙은 재생성 가능한 Memcached에도 적용할 수 있습니다.
+- fallback·stale·복구 중 Warm-up은 [공통 캐시 장애 정책](../resilience/redis-recovery.md)을 따릅니다. Memcached에서는 유실된 Key 범위와 Client 재매핑 때문에 발생한 miss를 추가로 확인합니다.
 - 캐시 put 실패로 이미 성공한 원본 조회를 무제한 반복하지 않습니다. 늦은 stale write와 쓰기 후 무효화는 별도 정합성 정책이 필요합니다.
 
 관측은 hit/miss와 호출 오류를 분리하고 eviction, 메모리, 연결, 응답 지연과 원본 QPS·포화를 함께 봅니다. 단순 hit ratio 하락만으로 노드 장애라고 단정하지 않습니다.
 
-### Q8. Redis와 Memcached 중 무엇을 선택하나요?
+### Redis와 Memcached 중 무엇을 선택하나요?
 
 단순 Key-Value 캐싱이면 Memcached를 검토할 수 있고 자료구조·복제·영속성 등 요구가 있으면 Redis OSS나 Valkey 등 대안을 비교합니다. 기능이 많다는 이유만으로 항상 더 적합한 것은 아닙니다. Item 크기, Key 분포, 지연, 실패 시 원본 용량, 운영 기능과 비용으로 평가합니다.
 
@@ -105,17 +107,19 @@ Serverless는 TLS를 지원하는 클라이언트가 필요하며 노드 기반�
 
 ## 예상 꼬리 질문과 답변
 
+**CDN 엣지 캐시도 Memcached처럼 Key를 노드 하나에만 분배하나요?** 목적과 구조가 다릅니다. CDN은 같은 콘텐츠를 여러 엣지에 캐싱해 전달 지연을 줄일 수 있고, 일반적인 Memcached 샤딩은 Key 담당 노드를 선택합니다. [CDN과 샤딩 비교](../networking/cdn-cloudfront-s3.md)
+
 **Memcached를 3대로 샤딩하면 SPOF가 해결되나요?** 일반적인 노드 기반 구성에서는 각 노드가 서로 다른 Key를 맡으며 복제본이 자동으로 생기지 않습니다. 한 노드 장애 시 해당 Key의 캐시를 잃을 수 있습니다. 원본 fallback이 핵심 기능을 유지할지는 대량 miss 중 원본 용량과 부하 제어에 달려 있습니다. 노드 수 증가와 [고가용성 확보](../resilience/spof-high-availability.md)는 구분해야 합니다. Serverless의 복제된 Multi-AZ 구조는 위 배포 비교를 참고합니다.
 
-**Q1. 노드를 추가하면 캐시 hit가 유지되나요?** Key 매핑이 바뀌면 다른 노드에서 miss가 발생할 수 있습니다. consistent hashing은 재매핑 범위를 줄일 수 있지만 자동 데이터 이동이나 무손실 확장을 보장하지 않습니다. 증설 시 원본 부하도 검증합니다.
+**노드를 추가하면 캐시 hit가 유지되나요?** Key 매핑이 바뀌면 다른 노드에서 miss가 발생할 수 있습니다. consistent hashing은 재매핑 범위를 줄일 수 있지만 자동 데이터 이동이나 무손실 확장을 보장하지 않습니다. 증설 시 원본 부하도 검증합니다.
 
-**Q2. 클라이언트마다 Key 매핑이 다르면요?** 같은 Key가 다른 노드로 갈 수 있어 miss나 값 불일치가 생깁니다. 노드 목록, hash 규칙, Key namespace와 직렬화 계약을 맞춰야 합니다.
+**클라이언트마다 Key 매핑이 다르면요?** 같은 Key가 다른 노드로 갈 수 있어 miss나 값 불일치가 생깁니다. 노드 목록, hash 규칙, Key namespace와 직렬화 계약을 맞춰야 합니다.
 
-**Q3. 모든 노드를 LB 뒤에 두면 되나요?** 무작위 요청 분산으로 set과 get이 다른 노드에 가면 값이 있어도 miss가 됩니다. Key 기반 routing을 유지하는 클라이언트나 이를 지원하는 proxy가 필요합니다. 일반 HTTP LB 설정으로 해결되는 문제가 아닙니다.
+**모든 노드를 LB 뒤에 두면 되나요?** 무작위 요청 분산으로 set과 get이 다른 노드에 가면 값이 있어도 miss가 됩니다. Key 기반 routing을 유지하는 클라이언트나 이를 지원하는 proxy가 필요합니다. 일반 HTTP LB 설정으로 해결되는 문제가 아닙니다.
 
-**Q4. TTL을 길게 잡으면 데이터가 보존되나요?** 만료 빈도는 줄지만 eviction·노드 장애는 남고 freshness도 나빠집니다. Memcached를 유일한 원본으로 사용하는 근거가 되지 않습니다.
+**TTL을 길게 잡으면 데이터가 보존되나요?** 만료 빈도는 줄지만 eviction·노드 장애는 남고 freshness도 나빠집니다. Memcached를 유일한 원본으로 사용하는 근거가 되지 않습니다.
 
-**Q5. CAS와 add로 무엇을 할 수 있나요?** `add`는 Key가 없을 때 저장하고 CAS는 읽은 뒤 값이 변경되지 않았을 때 갱신하는 경쟁 제어 수단입니다. 캐시 유실과 timeout이 있으므로 이것만으로 업무의 exactly-once나 안전한 분산 락을 보장하지 않습니다. [Memcached Protocol](https://docs.memcached.org/protocols/basic/)
+**CAS와 add로 무엇을 할 수 있나요?** `add`는 Key가 없을 때 저장하고 CAS는 읽은 뒤 값이 변경되지 않았을 때 갱신하는 경쟁 제어 수단입니다. 캐시 유실과 timeout이 있으므로 이것만으로 업무의 exactly-once나 안전한 분산 락을 보장하지 않습니다. [Memcached Protocol](https://docs.memcached.org/protocols/basic/)
 
 ## 한계 / 주의점 및 답변 보완
 
@@ -124,6 +128,8 @@ Serverless는 TLS를 지원하는 클라이언트가 필요하며 노드 기반�
 이 문서는 개념과 설계 기준이며 실제 Memcached/ElastiCache 생성·연결·장애 시험 결과가 아닙니다.
 
 ## 관련 문서 / 공식 참고 자료
+
+자료 확인일: 2026-10-08. 제품 기능은 링크된 공식 latest/current 문서 기준이며, 실제 배포의 엔진·클라이언트·프레임워크 버전과 지원 설정을 별도로 확인합니다.
 
 - [다단계 캐시](multi-level-cache.md), [Single Flight](single-flight.md), [Cache Stampede](cache-stampede.md), [Cache Avalanche](cache-avalanche.md)
 - [Circuit Breaker](../resilience/circuit-breaker.md), [Redis 장애 복구와 Graceful Degradation](../resilience/redis-recovery.md)

@@ -16,7 +16,9 @@ Offset Replay는 보존된 로그의 과거 위치부터 다시 읽어 처리를
 
 ## 면접 답변 예시
 
-> Replay는 보존된 이벤트를 재처리하는 복구 수단입니다. 먼저 누락이나 잘못된 결과의 범위를 확인하고 원인을 수정한 뒤 대상을 선정합니다. 같은 Group의 offset을 변경하면 Consumer를 중지하고 기존 offset을 보관한 후 변경 계획을 검토합니다. 재처리에는 멱등성뿐 아니라 version 기반 최신성 검사와 외부 부작용 제어가 필요합니다. At-least-once는 전달 의미이며 최종 정합성을 자동 보장하지 않습니다. 완료 여부는 Lag 감소뿐 아니라 누락·중복·최종 상태의 대조로 판단합니다.
+> Replay는 보존된 이벤트를 재처리하는 복구 수단입니다. 먼저 누락이나 잘못된 결과의 범위를 확인하고 원인을 수정한 뒤 대상을 선정합니다.
+
+추가 설명: 같은 Group의 offset을 변경하면 Consumer를 중지하고 기존 offset을 보관한 후 변경 계획을 검토합니다. 재처리에는 멱등성뿐 아니라 version 기반 최신성 검사와 외부 부작용 제어가 필요합니다. At-least-once는 전달 의미이며 최종 정합성을 자동 보장하지 않습니다. 완료 여부는 Lag 감소뿐 아니라 누락·중복·최종 상태의 대조로 판단합니다.
 
 ## 실무 적용과 설계 판단 기준
 
@@ -37,26 +39,36 @@ retention으로 삭제됐거나 compacted topic에서 과거 변경이 제거됐
 | 상황 | 설계 예시 | 주의점 |
 |---|---|---|
 | 동일 이벤트 재전달 | 안정적인 event ID와 unique constraint/dedup 기록 | 중복 기록과 업무 반영을 원자적으로 처리해야 함 |
-| 상태 동기화 | entity별 단조 version을 비교해 조건부 갱신 | 무조건 upsert하면 과거 값이 최신 상태를 덮을 수 있음 |
+| 완전한 상태 동기화 | entity별 단조 version을 비교해 조건부 교체 | 이벤트가 해당 version의 완전한 상태를 포함할 때 적용. delta에 그대로 사용하지 않음 |
 | 삭제 후 과거 이벤트 | tombstone/삭제 version 보존 | 삭제 흔적이 없으면 데이터가 부활할 수 있음 |
 | 결제·메일·외부 API | 수신 측 idempotency key, outbox/inbox 등 | 로컬 dedup만으로 외부 호출과 DB 갱신의 원자성이 생기지 않음 |
 | 증분 연산 | 적용 여부와 증분 반영의 원자적 기록 | 잔액 증가·수량 감소는 재적용 시 값이 달라짐 |
 
-예를 들어 version 12가 저장된 뒤 version 11이 replay되면 조건부 갱신으로 거절합니다. timestamp는 시계 오차와 동일 시각 때문에 충분한 순서 기준이 아닐 수 있습니다. [DynamoDB 조건부 쓰기](../database/dynamodb.md)도 구현 수단 중 하나입니다. 이러한 정책은 적용 대상의 상태 모델에 맞춰 검증해야 하는 설계 예시입니다.
+완전한 상태를 담은 version 12가 저장된 뒤 version 11이 도착하면 조건부 갱신으로 거절할 수 있습니다. 반면 version 11의 `+10`, version 12의 `-3` 같은 delta는 중간 이벤트를 건너뛰면 결과가 틀립니다. delta는 중복 판별과 순서·누락 감지, 필요하면 gap 대기/재조회나 원본 상태 재동기화를 설계합니다. timestamp는 시계 오차와 동일 시각 때문에 충분한 순서 기준이 아닐 수 있습니다. [DynamoDB 조건부 쓰기](../database/dynamodb.md)도 구현 수단 중 하나입니다. 이러한 정책은 적용 대상의 상태 모델에 맞춰 검증해야 하는 설계 예시입니다.
+
+### 잘못 반영된 동일 version의 보정
+
+처리 버그로 version 12의 결과가 잘못 저장돼도 dedup 기록이나 `incomingVersion > storedVersion` 조건은 수정된 version 12의 replay를 막을 수 있습니다. 원인을 고친 것과 기존 결과를 고친 것은 별도 작업입니다.
+
+- 전체 재구축은 별도 저장소/namespace와 별도 dedup 기록에서 replay하고 검증 후 전환합니다. 같은 DB에 같은 dedup 조건으로 쓰는 새 Group만으로는 해결되지 않습니다.
+- 선택적 보정은 대상 ID·version·예상 기존 값과 수정 값을 명시하고, 실시간 쓰기와 충돌하지 않도록 조건부 쓰기나 잠깐의 격리를 사용합니다. 보정 기록과 결과 대조를 남깁니다.
+- 외부 결제·메일 등의 부작용은 무작정 다시 실행하지 않습니다. 수신 측 상태 확인과 업무상 보상/보정 절차를 판단합니다.
+
+이는 상태 모델에 따른 설계 예시이며 보호 조건을 전역 해제하거나 dedup 기록을 일괄 삭제하라는 의미는 아닙니다.
 
 ## 예상 꼬리 질문과 답변
 
-**Q1. At-least-once면 최종 정합성이 보장되나요?** 아닙니다. 잘못된 이벤트, 오래된 값의 덮어쓰기, 삭제 누락과 영구 실패가 있으면 수렴하지 않습니다. 중복 안전성, 최신성 판단과 실패 복구가 필요합니다.
+**At-least-once면 최종 정합성이 보장되나요?** 아닙니다. 잘못된 이벤트, 오래된 값의 덮어쓰기, 삭제 누락과 영구 실패가 있으면 수렴하지 않습니다. 중복 안전성, 최신성 판단과 실패 복구가 필요합니다.
 
-**Q2. Eventual Consistency이면 중복을 허용해도 되나요?** 최종 상태가 수렴하는 연산과 규칙이 있어야 합니다. 선언만으로 증분 연산이나 외부 부작용이 안전해지지 않습니다.
+**Eventual Consistency이면 중복을 허용해도 되나요?** 최종 상태가 수렴하는 연산과 규칙이 있어야 합니다. 선언만으로 증분 연산이나 외부 부작용이 안전해지지 않습니다.
 
-**Q3. Producer idempotence로 충분하지 않나요?** Producer 재시도의 중복 제어와 Consumer 업무 멱등성은 다릅니다. replay나 DB 반영 후 commit 전 장애의 재실행을 해결하지 않습니다.
+**Producer idempotence로 충분하지 않나요?** Producer 재시도의 중복 제어와 Consumer 업무 멱등성은 다릅니다. replay나 DB 반영 후 commit 전 장애의 재실행을 해결하지 않습니다.
 
-**Q4. Exactly-once면 DB 중복도 없어지나요?** Kafka transaction으로 Kafka 출력과 소비 offset을 묶을 수 있지만 외부 DB/API까지 자동으로 같은 트랜잭션이 되지는 않습니다. 시스템 경계와 수신 측 멱등성을 확인합니다. [Kafka 전달 의미](https://kafka.apache.org/43/design/design/)
+**Exactly-once면 DB 중복도 없어지나요?** Kafka 내부 read-process-write에서는 transaction으로 출력과 소비 offset을 원자적으로 반영하고, 자동 commit을 끄며 downstream Consumer가 `isolation.level=read_committed`로 중단된 transaction의 출력을 읽지 않도록 구성해야 합니다. transaction abort·재시작·Rebalancing 처리도 검증합니다. 외부 DB/API까지 자동으로 같은 트랜잭션이 되지는 않습니다. 시스템 경계와 수신 측 멱등성을 확인합니다. [Kafka 전달 의미](https://kafka.apache.org/43/design/design/)
 
-**Q5. auto.offset.reset을 earliest로 바꾸면 replay되나요?** 유효한 committed offset이 있으면 그 위치가 사용됩니다. 이 설정은 offset이 없거나 유효하지 않을 때의 정책이며 명시적인 replay를 대체하지 않습니다. [Consumer 설정](https://kafka.apache.org/43/configuration/consumer-configs/)
+**auto.offset.reset을 earliest로 바꾸면 replay되나요?** 유효한 committed offset이 있으면 그 위치가 사용됩니다. 이 설정은 offset이 없거나 유효하지 않을 때의 정책이며 명시적인 replay를 대체하지 않습니다. [Consumer 설정](https://kafka.apache.org/43/configuration/consumer-configs/)
 
-**Q6. DLQ로 옮기면 복구가 끝났나요?** 실패 격리일 뿐입니다. 원인 수정, 재처리, 결과 대조와 미해결 이벤트 관리가 있어야 완료됩니다. 뒤 이벤트를 계속 처리하면 순서 영향도 확인해야 합니다.
+**DLQ로 옮기면 복구가 끝났나요?** 실패 격리일 뿐입니다. 원인 수정, 재처리, 결과 대조와 미해결 이벤트 관리가 있어야 완료됩니다. 뒤 이벤트를 계속 처리하면 순서 영향도 확인해야 합니다.
 
 ## 한계 / 주의점 및 답변 보완
 
@@ -65,6 +77,8 @@ dedup 보존 기간이 replay 범위보다 짧으면 과거 부작용이 다시 
 이 문서는 복구 판단과 절차이며 실제 Group의 offset 변경이나 데이터 재처리 결과가 아닙니다.
 
 ## 관련 문서 / 공식 참고 자료
+
+자료 확인일: 2026-10-08. Kafka 동작은 Apache Kafka 4.3 문서 기준입니다.
 
 - [Partition과 Rebalancing](kafka-partition-rebalancing.md), [Schema Registry 호환성](kafka-schema-registry.md)
 - [DynamoDB](../database/dynamodb.md), [캐시의 version 기반 정합성](../caching/multi-level-cache.md)

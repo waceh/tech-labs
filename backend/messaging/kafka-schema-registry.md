@@ -38,7 +38,9 @@ Schema Registry는 Schema 버전과 데이터 계약을 관리하고 호환성�
 
 ## 면접 답변 예시
 
-> BACKWARD는 새 reader Schema가 이전 writer Schema로 기록된 데이터를 읽을 수 있는지 검사하는 정책입니다. 기본 정책은 직전 버전과 검사하며 장기 replay에는 BACKWARD_TRANSITIVE를 검토합니다. Avro의 기본값 있는 필드 추가는 예시이고 다른 형식은 규칙이 다릅니다. 일반적인 BACKWARD 변경은 Consumer부터 갱신해 기존 데이터 읽기를 확인한 뒤 Producer를 전환합니다. Schema 오류와 Rebalancing은 별개이며 등록 실패인지 기록된 데이터의 읽기 실패인지 구분해야 합니다. 새 버전 등록은 기존 메시지를 수정하지 않으므로 수정된 Consumer와 실제 데이터로 재처리를 검증합니다.
+> BACKWARD는 새 reader Schema가 이전 writer Schema로 기록된 데이터를 읽을 수 있는지 검사하는 정책입니다. 기본 정책은 직전 버전과 검사하며 장기 replay에는 BACKWARD_TRANSITIVE를 검토합니다.
+
+추가 설명: Avro의 기본값 있는 필드 추가는 예시이고 다른 형식은 규칙이 다릅니다. 일반적인 BACKWARD 변경은 Consumer부터 갱신해 기존 데이터 읽기를 확인한 뒤 Producer를 전환합니다. Schema 오류와 Rebalancing은 별개이며 등록 실패인지 기록된 데이터의 읽기 실패인지 구분해야 합니다. 새 버전 등록은 기존 메시지를 수정하지 않으므로 수정된 Consumer와 실제 데이터로 재처리를 검증합니다.
 
 ## 실무 적용과 설계 판단 기준
 
@@ -60,15 +62,15 @@ Schema Registry는 Schema 버전과 데이터 계약을 관리하고 호환성�
 
 ## 예상 꼬리 질문과 답변
 
-**Q1. BACKWARD면 모든 과거 메시지를 읽을 수 있나요?** 기본 검사는 직전 버전 대상입니다. 모든 이전 버전은 TRANSITIVE 정책으로 검사하고 실제 replay 데이터로도 검증합니다.
+**BACKWARD면 모든 과거 메시지를 읽을 수 있나요?** 기본 검사는 직전 버전 대상입니다. 모든 이전 버전은 TRANSITIVE 정책으로 검사하고 실제 replay 데이터로도 검증합니다.
 
-**Q2. Default만 있으면 필드 추가가 항상 안전한가요?** Avro의 해당 예시이며 형식과 다른 변경을 함께 검사해야 합니다. 업무 필수값을 `unknown`으로 해석해도 되는지와 Consumer 로직은 별도 문제입니다.
+**Default만 있으면 필드 추가가 항상 안전한가요?** Avro의 해당 예시이며 형식과 다른 변경을 함께 검사해야 합니다. 업무 필수값을 `unknown`으로 해석해도 되는지와 Consumer 로직은 별도 문제입니다.
 
-**Q3. 구 Consumer로 rollback할 수 있나요?** 새 writer를 구 reader가 읽는 방향은 BACKWARD만으로 보장되지 않습니다. 양방향 호환성이나 별도 전환 전략을 검증합니다.
+**구 Consumer로 rollback할 수 있나요?** 새 writer를 구 reader가 읽는 방향은 BACKWARD만으로 보장되지 않습니다. 양방향 호환성이나 별도 전환 전략을 검증합니다.
 
-**Q4. 브로커가 모든 payload를 검증하나요?** Registry의 등록 검사, 클라이언트 SerDes 사용과 브로커 측 검증 설정은 다릅니다. 실제 발행 경로의 검증 범위를 확인합니다.
+**브로커가 모든 payload를 검증하나요?** Registry의 등록 검사, 클라이언트 SerDes 사용과 브로커 측 검증 설정은 다릅니다. 실제 발행 경로의 검증 범위를 확인합니다.
 
-**Q5. 오류 해결 후 반드시 offset을 되돌리나요?** 정상 [Rebalancing](kafka-partition-rebalancing.md)에는 필요하지 않습니다. 실패 위치에 머물렀다면 재시도로 처리할 수 있고 이미 건너뛰었거나 잘못 반영한 범위가 있으면 [Replay와 멱등성](kafka-offset-replay.md)을 평가합니다.
+**오류 해결 후 반드시 offset을 되돌리나요?** 정상 [Rebalancing](kafka-partition-rebalancing.md)에는 필요하지 않습니다. 실패 위치에 머물렀다면 재시도로 처리할 수 있고 이미 건너뛰었거나 잘못 반영한 범위가 있으면 [Replay와 멱등성](kafka-offset-replay.md)을 평가합니다.
 
 ## 한계 / 주의점 및 답변 보완
 
@@ -77,6 +79,8 @@ Schema Registry는 Schema 버전과 데이터 계약을 관리하고 호환성�
 JSON은 설명용이며 실제 Registry 등록·호환성 API 호출·재처리 검증 결과가 아닙니다.
 
 ## 관련 문서 / 공식 참고 자료
+
+자료 확인일: 2026-10-08. Kafka 동작은 Apache Kafka 4.3 문서 기준입니다. Schema Registry는 Confluent current, Avro 예시는 1.12.0 기준입니다.
 
 - [Partition과 Rebalancing](kafka-partition-rebalancing.md), [Offset Replay와 멱등성](kafka-offset-replay.md)
 - [Confluent Schema Evolution](https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html), [Confluent SerDes](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html)

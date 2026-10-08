@@ -14,7 +14,8 @@
 | Backend / Caching | [Caffeine / Redis와 다단계 캐시](backend/caching/multi-level-cache.md) | L1/L2의 역할과 정합성을 어떻게 설계하는가? |
 | Backend / Caching | [Memcached와 AWS ElastiCache](backend/caching/memcached-elasticache.md) | 캐시 저장 위치, Key 샤딩과 복제를 구분하고 엔진·배포 방식을 어떻게 선택하는가? |
 | Backend / Resilience | [Redis 장애 복구와 Graceful Degradation](backend/resilience/redis-recovery.md) | 캐시 장애 중 원본을 보호하고 서비스를 어떻게 회복하는가? |
-| Backend / Resilience | [Circuit Breaker와 장애 감지·Slack 알림](backend/resilience/circuit-breaker.md) | 장애를 어떻게 감지하고 서킷 발동 이후 요청 처리와 운영 알림을 연결하는가? |
+| Backend / Resilience | [Circuit Breaker와 요청 보호](backend/resilience/circuit-breaker.md) | 호출 실패·지연을 어떻게 감지하고 차단·시험 호출·fallback을 결정하는가? |
+| Backend / Resilience | [장애 감지와 운영 알림](backend/resilience/operational-alerting.md) | 반복 장애와 사용자 영향을 어떻게 감시하고 Slack·당직 경로로 전달하는가? |
 | Backend / Resilience | [SPOF와 고가용성](backend/resilience/spof-high-availability.md) | 역할별 장애 영향과 샤딩·복제·Failover를 구분해 가용성을 어떻게 설계하는가? |
 | Backend / Database | [DynamoDB와 데이터베이스 선택](backend/database/dynamodb.md) | 접근 패턴과 Key 설계로 DynamoDB, MongoDB, DocumentDB를 어떻게 비교하는가? |
 | Backend / Messaging | [Kafka Partition 수와 Rebalancing](backend/messaging/kafka-partition-rebalancing.md) | 처리량에 맞는 Partition 수와 증설·할당 변경의 영향을 어떻게 판단하는가? |
@@ -22,6 +23,7 @@
 | Backend / Messaging | [Kafka Schema Registry와 호환성](backend/messaging/kafka-schema-registry.md) | BACKWARD 정책, 배포 순서와 Schema 오류 복구를 어떻게 설명하는가? |
 | Backend / Networking | [Load Balancer와 AWS 종류](backend/networking/load-balancer.md) | 연결·요청·자원 부하를 구분하고 분산 알고리즘과 Health Check를 어떻게 선택하는가? |
 | Backend / Networking | [Route 53과 DNS 라우팅](backend/networking/route53-dns-routing.md) | DNS 분산과 ALB의 차이, 가중치와 장애 전환 지연을 어떻게 설명하는가? |
+| Backend / Networking | [CDN, CloudFront와 S3](backend/networking/cdn-cloudfront-s3.md) | 전송·원본 저장·데이터 캐시를 구분하고 캐시 키·TTL·엣지 선택을 어떻게 설계하는가? |
 
 ## 문서 작성 기준
 
@@ -29,7 +31,7 @@
 
 1. 질문 의도
 2. 핵심 개념
-3. 면접 답변 예시
+3. 면접 답변 예시: 짧은 기본 답변과 추가 설명
 4. 실무 적용과 설계 판단 기준
 5. 예상 꼬리 질문과 답변
 6. 한계 / 주의점 및 답변 보완
@@ -39,7 +41,7 @@
 
 ## 새로운 기술 추가
 
-한 주제당 하나의 `.md` 파일을 추가하고 위 목차에 연결합니다. Backend의 concurrency/database/messaging, Architecture의 distributed-systems/system-design, Platform, AI Engineering 등은 **첫 문서를 작성할 때** 필요한 디렉터리를 만듭니다. 분야별 독립 문서를 유지하고 관련 주제는 링크로 연결합니다. 다른 문서가 있는 기술은 본문에서 처음 설명하거나 대응 방안으로 제시하는 위치에 상대 경로 링크를 둡니다. 문서 하단의 관련 자료에도 연결하되, 같은 문단에서 반복해서 링크하지 않습니다. 빈 폴더나 실행 프로젝트를 먼저 만들 필요는 없습니다.
+한 주제당 하나의 `.md` 파일을 추가하고 위 목차에 연결합니다. Backend의 concurrency/database/messaging, Architecture의 distributed-systems/system-design, Platform, AI Engineering 등은 **첫 문서를 작성할 때** 필요한 디렉터리를 만듭니다. 분야별 독립 문서를 유지하고 관련 주제는 링크로 연결합니다. 다른 문서가 있는 기술은 본문에서 처음 설명하거나 대응 방안으로 제시하는 위치에 상대 경로 링크를 둡니다. 문서 하단의 관련 자료에도 연결하되, 같은 문단에서 반복해서 링크하지 않습니다. 질문 제목은 번호 없이 사용해 본문과 꼬리 질문의 번호 충돌을 피합니다. 제품별 문서는 참고 자료에 확인일과 문서 버전 범위를 적고, 동일한 공통 정책은 기준 문서에 상세 설명을 모읍니다. 빈 폴더나 실행 프로젝트를 먼저 만들 필요는 없습니다.
 
 ## 선택적 코드 참고
 

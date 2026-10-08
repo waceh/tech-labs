@@ -19,10 +19,8 @@ mvn spring-boot:run
 - [SingleFlight.java](src/main/java/io/github/waceh/caching/SingleFlight.java): Key별 Future 등록과 leader/follower, 요청별 Future copy
 - [ProductService.java](src/main/java/io/github/waceh/caching/ProductService.java): Caffeine L1과 leader의 캐시 재확인
 - [SingleFlightTest.java](src/test/java/io/github/waceh/caching/SingleFlightTest.java): 중첩 요청, 실패, timeout/cancel 격리와 객체별 범위
-- [기존 검증 기록](docs/verification.md): 2026-10-08 이전 작업에서 테스트 10개와 실행 JAR 확인
+- [기존 검증 기록](docs/verification.md): 2026-10-08 검증에서 테스트 10개와 실행 JAR 확인
 
 ## 해석과 한계
 
 통제된 중첩 요청 100개의 모의 원본 조회가 100회에서 1회로 줄어든 결과이며 실제 DB 성능 개선율이 아닙니다. 실제 Redis, DB, 분산 락, Warm-up, Bulkhead, Load Shedding은 구현하지 않았습니다. in-flight Key/follower 수와 Executor의 작업 수를 제한하지 않으므로 운영용으로 바로 도입할 수 없습니다. 요청 timeout이 실제 원본 I/O를 중단시키지는 않습니다.
-
-이번 문서 재구성에서는 소스와 테스트 내용을 변경하지 않았습니다.

@@ -23,7 +23,9 @@ Rebalancing은 Group의 Partition 할당을 조정하는 과정입니다. 멤버
 
 ## 면접 답변 예시
 
-> Partition 수는 Peak 유입량, Consumer의 실측 처리량과 목표 backlog 해소 시간을 기준으로 정합니다. 같은 Group의 병렬성은 Partition 수로 제한되지만 downstream 용량과 Key 편향도 확인해야 합니다. 기존 Topic의 Partition 수는 직접 줄일 수 없으므로 초기 설계에서 확장 여유와 관리 비용을 함께 고려합니다. 증설하면 할당과 Key의 Partition 매핑이 바뀔 수 있으며 기존 데이터가 새 Partition으로 이동하지는 않습니다. 정상 Rebalancing은 유효한 committed offset에서 재개하므로 임의 offset reset이 필요하지 않습니다. 새 Partition의 초기 offset 정책과 미완료 작업의 재처리 가능성은 별도로 확인합니다.
+> Partition 수는 Peak 유입량, Consumer의 실측 처리량과 목표 backlog 해소 시간을 기준으로 정합니다. 같은 Group의 병렬성은 Partition 수로 제한되지만 downstream 용량과 Key 편향도 확인해야 합니다.
+
+추가 설명: 기존 Topic의 Partition 수는 직접 줄일 수 없으므로 초기 설계에서 확장 여유와 관리 비용을 함께 고려합니다. 증설하면 할당과 Key의 Partition 매핑이 바뀔 수 있으며 기존 데이터가 새 Partition으로 이동하지는 않습니다. 정상 Rebalancing은 유효한 committed offset에서 재개하므로 임의 offset reset이 필요하지 않습니다. 새 Partition의 초기 offset 정책과 미완료 작업의 재처리 가능성은 별도로 확인합니다.
 
 ## 실무 적용과 설계 판단 기준
 
@@ -57,17 +59,17 @@ Rebalancing은 Group의 Partition 할당을 조정하는 과정입니다. 멤버
 
 ## 예상 꼬리 질문과 답변
 
-**Q1. Consumer와 Partition은 반드시 1:1인가요?** 아닙니다. 하나가 여러 Partition을 맡을 수 있습니다. 단일 Topic을 소비하는 같은 Group에서 Consumer 수가 Partition 수보다 많으면 일부는 할당을 받지 못합니다. 여러 Topic 구독이면 전체 할당과 assignor도 고려합니다.
+**Consumer와 Partition은 반드시 1:1인가요?** 아닙니다. 하나가 여러 Partition을 맡을 수 있습니다. 단일 Topic을 소비하는 같은 Group에서 Consumer 수가 Partition 수보다 많으면 일부는 할당을 받지 못합니다. 여러 Topic 구독이면 전체 할당과 assignor도 고려합니다.
 
-**Q2. Partition 수가 많을수록 좋은가요?** 병렬성은 늘 수 있지만 로그·복제·메타데이터와 장애 복구 비용도 증가합니다. 초기 값을 무조건 작거나 크게 잡기보다 Peak, 확장 여유와 클러스터 한도로 결정합니다.
+**Partition 수가 많을수록 좋은가요?** 병렬성은 늘 수 있지만 로그·복제·메타데이터와 장애 복구 비용도 증가합니다. 초기 값을 무조건 작거나 크게 잡기보다 Peak, 확장 여유와 클러스터 한도로 결정합니다.
 
-**Q3. 기존 Partition을 줄여야 한다면요?** 직접 축소 대신 새 Topic과 데이터/Producer/Consumer 전환을 설계합니다. offset, 중복 처리와 순서의 전환 경계를 검증해야 합니다.
+**기존 Partition을 줄여야 한다면요?** 직접 축소 대신 새 Topic과 데이터/Producer/Consumer 전환을 설계합니다. offset, 중복 처리와 순서의 전환 경계를 검증해야 합니다.
 
-**Q4. 증설하면 기존 Hot Key도 분산되나요?** 같은 Key를 하나의 Partition으로 보내면 그 Key 자체는 분산되지 않습니다. Key를 나누면 순서와 집계 설계가 바뀝니다. 기존 backlog도 자동 이동하지 않습니다.
+**증설하면 기존 Hot Key도 분산되나요?** 같은 Key를 하나의 Partition으로 보내면 그 Key 자체는 분산되지 않습니다. Key를 나누면 순서와 집계 설계가 바뀝니다. 기존 backlog도 자동 이동하지 않습니다.
 
-**Q5. Rebalancing 뒤 Lag이 늘면 offset을 reset하나요?** 정상 할당 변경에는 필요하지 않습니다. 처리량과 반복 Rebalancing 원인을 먼저 확인합니다. 누락이 검증된 경우에만 [Replay](kafka-offset-replay.md)의 범위와 부작용을 평가합니다.
+**Rebalancing 뒤 Lag이 늘면 offset을 reset하나요?** 정상 할당 변경에는 필요하지 않습니다. 처리량과 반복 Rebalancing 원인을 먼저 확인합니다. 누락이 검증된 경우에만 [Replay](kafka-offset-replay.md)의 범위와 부작용을 평가합니다.
 
-**Q6. Schema Registry 오류도 Rebalancing 문제인가요?** 별개입니다. 할당 변경은 소비 소유권 문제이고 [Schema 호환성](kafka-schema-registry.md)은 읽기 계약 문제입니다. 오류 위치로 구분해야 합니다.
+**Schema Registry 오류도 Rebalancing 문제인가요?** 별개입니다. 할당 변경은 소비 소유권 문제이고 [Schema 호환성](kafka-schema-registry.md)은 읽기 계약 문제입니다. 오류 위치로 구분해야 합니다.
 
 ## 한계 / 주의점 및 답변 보완
 
@@ -76,6 +78,8 @@ Partition 내부 저장 순서가 애플리케이션의 처리 완료 순서까�
 이 문서의 용량 모델과 사례는 설명용이며 실제 클러스터 증설·부하 시험 결과가 아닙니다.
 
 ## 관련 문서 / 공식 참고 자료
+
+자료 확인일: 2026-10-08. Kafka 동작은 Apache Kafka 4.3 문서 기준입니다.
 
 - [Offset Replay와 멱등성](kafka-offset-replay.md), [Schema Registry 호환성](kafka-schema-registry.md)
 - [Apache Kafka 개요](https://kafka.apache.org/43/getting-started/introduction/)

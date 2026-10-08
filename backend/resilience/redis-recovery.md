@@ -25,7 +25,7 @@ Redis가 한 대라는 사실만으로 서비스 전체의 [SPOF](spof-high-avai
 
 ### Replication과 Failover
 
-Replication은 데이터를 복제본에 전달하는 것이고 Failover는 장애 시 다른 노드가 Primary 역할을 이어받도록 전환하는 것입니다.
+[Replication과 Failover의 일반적인 차이](spof-high-availability.md)는 HA 문서를 참고합니다. Redis에서는 복제뿐 아니라 감지·승격과 Client 재연결을 함께 확인합니다.
 
 ```text
 Primary ── 비동기 복제 ──> Replica
@@ -42,20 +42,24 @@ Redis의 기본 복제는 비동기이므로 승격 시 복제되지 않은 최�
 
 ## 면접 답변 예시
 
-> 재생성 가능한 캐시의 장애에서는 정상 miss와 접근 실패를 구분하고 timeout과 Circuit Breaker로 반복 대기를 줄입니다. 유효한 로컬 캐시를 활용하고 동일 Key 조회는 병합하되, 다른 Key의 원본 fallback은 동시성 한도로 제어해야 합니다. stale 응답이나 기능 축소는 업무상 허용된 범위에서 적용하며 재고·결제·권한은 별도 검증하거나 명시적으로 실패해야 합니다. 복구 후에는 데이터 보존 범위와 hot set의 적중률을 확인하고 Warm-up과 사용자 요청을 전체 원본 예산 안에서 처리합니다. 원본 지연, 풀 대기, API tail latency와 오류율을 확인하며 트래픽 제한을 점진적으로 해제합니다.
+> 재생성 가능한 캐시의 장애에서는 정상 miss와 접근 실패를 구분하고 timeout과 Circuit Breaker로 반복 대기를 줄입니다. 유효한 로컬 캐시를 활용하고 동일 Key 조회는 병합하되, 다른 Key의 원본 fallback은 동시성 한도로 제어해야 합니다.
+
+추가 설명: stale 응답이나 기능 축소는 업무상 허용된 범위에서 적용하며 재고·결제·권한은 별도 검증하거나 명시적으로 실패해야 합니다. 복구 후에는 데이터 보존 범위와 hot set의 적중률을 확인하고 Warm-up과 사용자 요청을 전체 원본 예산 안에서 처리합니다. 원본 지연, 풀 대기, API tail latency와 오류율을 확인하며 트래픽 제한을 점진적으로 해제합니다.
 
 ## 실무 적용과 설계 판단 기준
 
 ### 장애 감지와 운영 알림
 
-Redis GET 성공 후 값이 없는 정상 miss와 timeout·연결 오류를 구분합니다. 성공한 호출도 느려질 수 있으므로 실패율뿐 아니라 호출 지연과 slow call 비율을 관측합니다. 서킷 발동은 최소 표본과 관측 구간을 기준으로 판단하고, OPEN에서는 Redis를 반복 호출하지 않은 채 아래 원본 보호와 fallback 정책을 적용합니다.
+정상 miss와 호출 오류를 구분하며 지연도 관측합니다. 감지·차단 기준은 [Circuit Breaker](circuit-breaker.md), 수집·그룹화·Slack 설정은 [운영 알림](operational-alerting.md)을 참고합니다.
 
-서킷 상태·차단 호출·fallback 비율과 API/DB 영향 지표를 수집하고, Prometheus → Alertmanager → Slack으로 지속 장애와 사용자 영향을 알립니다. 상태 전환 로그를 함께 남기고 서비스·환경·의존성별로 알림을 묶습니다. HALF_OPEN 전환이나 알림 resolved만으로 전체 서비스 복구를 선언하지 않습니다. 감지 시나리오, 요청 흐름과 설정 예시는 [Circuit Breaker 문서](circuit-breaker.md)를 참고합니다.
+### 공통 캐시 장애 정책의 범위
+
+아래 원본 보호·stale·Warm-up 기준은 Redis를 사례로 설명하며 재생성 가능한 다른 공유 캐시에도 적용할 수 있습니다. 각 제품의 데이터 보존·복제·Client 동작은 별도로 확인합니다.
 
 ### 장애 중
 
 1. Redis timeout/연결 오류와 정상 miss를 분리해 영향 범위를 확인합니다. cache 외 Redis 사용처도 점검합니다.
-2. 유효한 L1을 유지합니다. 장애를 이유로 전체 L1을 비우면 원본 부하가 커집니다. stale은 별도 보존과 최대 age 정책이 있을 때만 사용합니다.
+2. 유효한 L1을 유지합니다. 장애를 이유로 전체 L1을 비우면 원본 부하가 커집니다. stale은 별도 보존과 최대 age 정책이 있을 때만 사용합니다. 일반적인 Caffeine expiration만으로 만료 값이 자동 제공되는 것은 아닙니다.
 3. leader만 원본 호출 직전에 permit을 획득합니다. follower도 별도의 대기 수/메모리 한도가 필요합니다.
 4. 원본 예산 초과 시 빠르게 기능을 축소하거나 오류를 반환합니다. 서비스 과부하에는 503, 사용자별 rate limit에는 429 등을 상황에 맞게 사용합니다. 클라이언트 재시도에는 backoff/jitter와 한도를 둡니다.
 
@@ -93,8 +97,10 @@ cache-aside에서는 DB 갱신 전 시작한 조회가 무효화 후 오래된 �
 
 ## 관련 문서 / 공식 참고 자료
 
+자료 확인일: 2026-10-08. 제품 기능은 링크된 공식 latest/current 문서 기준이며, 실제 배포의 엔진·클라이언트·프레임워크 버전과 지원 설정을 별도로 확인합니다.
+
 - [SPOF와 고가용성](spof-high-availability.md): 역할별 장애 영향, 샤딩·복제·Failover의 구분
-- [Circuit Breaker: 장애 감지, 요청 처리와 Slack 알림](circuit-breaker.md)
+- [Circuit Breaker: 장애 감지와 요청 보호](circuit-breaker.md)
 - [Cache Avalanche](../caching/cache-avalanche.md), [Caffeine / Redis](../caching/multi-level-cache.md), [Single Flight](../caching/single-flight.md)
 - [Redis persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/)
 - [Redis distributed locks](https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/)

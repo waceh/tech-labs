@@ -40,7 +40,9 @@ MongoDB는 데이터베이스 엔진이고 Atlas는 MongoDB의 관리형 서비�
 
 ## 면접 답변 예시
 
-> DynamoDB의 장점은 분산 인프라 운영 부담을 줄이면서 명확한 Key 기반 접근 패턴을 확장하기 쉽다는 점입니다. 다만 Partition Key 편향이나 비효율적인 Scan은 성능과 비용 문제를 만들 수 있으므로 접근 패턴을 먼저 정하고 Key와 인덱스를 설계해야 합니다. MongoDB는 다양한 필드 조건과 Aggregation에 유연하며 Atlas를 통한 관리형 운영도 가능합니다. 따라서 조회 요구, 정합성, Key 분포와 비용으로 선택합니다. Amazon DocumentDB는 MongoDB API 호환 별도 엔진이므로 이전 시 기능과 실행 계획 검증이 필요합니다.
+> DynamoDB의 장점은 분산 인프라 운영 부담을 줄이면서 명확한 Key 기반 접근 패턴을 확장하기 쉽다는 점입니다. 다만 Partition Key 편향이나 비효율적인 Scan은 성능과 비용 문제를 만들 수 있으므로 접근 패턴을 먼저 정하고 Key와 인덱스를 설계해야 합니다.
+
+추가 설명: MongoDB는 다양한 필드 조건과 Aggregation에 유연하며 Atlas를 통한 관리형 운영도 가능합니다. 따라서 조회 요구, 정합성, Key 분포와 비용으로 선택합니다. Amazon DocumentDB는 MongoDB API 호환 별도 엔진이므로 이전 시 기능과 실행 계획 검증이 필요합니다.
 
 ## 실무 적용과 설계 판단 기준
 
@@ -56,15 +58,15 @@ Streams로 저장소나 캐시를 갱신한다면 중복·최신 version·실패
 
 ## 예상 꼬리 질문과 답변
 
-**Q1. GSI와 LSI는 어떻게 다른가요?** GSI는 원본과 다른 Partition Key와 선택적 Sort Key로 별도 조회 경로를 제공합니다. LSI는 원본 Partition Key를 유지하고 다른 Sort Key를 사용합니다. LSI는 테이블 생성 시 정의하며 GSI는 이후 추가할 수 있습니다. Projection·저장 비용·용량도 비교합니다. [AWS Secondary indexes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/SecondaryIndexes.html)
+**GSI와 LSI는 어떻게 다른가요?** GSI는 원본과 독립적으로 Key schema를 정의하며 다른 Partition Key와 선택적 Sort Key를 사용할 수 있습니다. 원본과 반드시 다른 Partition Key여야 하는 것은 아닙니다. LSI는 원본 Partition Key를 유지하고 다른 Sort Key를 사용합니다. LSI는 테이블 생성 시 정의하며 GSI는 이후 추가할 수 있습니다. Projection·저장 비용·용량도 비교합니다. [AWS Secondary indexes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/SecondaryIndexes.html)
 
-**Q2. 모든 읽기에 강한 일관성을 쓸 수 있나요?** 테이블과 LSI는 강한 일관성 읽기를 선택할 수 있지만 GSI와 Streams 읽기는 eventual consistency입니다. 갱신 직후 GSI에 최신 값이 보이지 않을 수 있으므로 중요한 확인 경로를 따로 설계합니다. Global Tables는 선택한 다중 리전 정합성 모드와 지원 조건을 별도로 확인합니다. [AWS Read consistency](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadConsistency.html)
+**모든 읽기에 강한 일관성을 쓸 수 있나요?** 테이블과 LSI는 강한 일관성 읽기를 선택할 수 있지만 GSI와 Streams 읽기는 eventual consistency입니다. 갱신 직후 GSI에 최신 값이 보이지 않을 수 있으므로 중요한 확인 경로를 따로 설계합니다. Global Tables는 선택한 다중 리전 정합성 모드와 지원 조건을 별도로 확인합니다. [AWS Read consistency](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadConsistency.html)
 
-**Q3. FilterExpression으로 다양한 조건을 조회하면 되나요?** 읽은 뒤 결과를 걸러내므로 읽기 용량 소비를 줄이는 인덱스 대체 수단이 아닙니다. 자주 사용하는 조건은 Key/인덱스로 표현합니다. [AWS Query filter](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.FilterExpression.html)
+**FilterExpression으로 다양한 조건을 조회하면 되나요?** 읽은 뒤 결과를 걸러내므로 읽기 용량 소비를 줄이는 인덱스 대체 수단이 아닙니다. 자주 사용하는 조건은 Key/인덱스로 표현합니다. [AWS Query filter](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.FilterExpression.html)
 
-**Q4. 접근 패턴이 바뀌면 어떻게 하나요?** 추가 인덱스나 별도 조회 모델을 설계할 수 있지만 중복 저장, backfill과 쓰기 비용이 늘 수 있습니다. 요구 변화 비용을 다른 데이터베이스와 비교해야 합니다.
+**접근 패턴이 바뀌면 어떻게 하나요?** 추가 인덱스나 별도 조회 모델을 설계할 수 있지만 중복 저장, backfill과 쓰기 비용이 늘 수 있습니다. 요구 변화 비용을 다른 데이터베이스와 비교해야 합니다.
 
-**Q5. 조건부 쓰기로 무엇을 보호하나요?** 예상 version과 일치할 때만 갱신하거나 없는 Item만 생성해 경쟁 쓰기·중복 처리를 제어할 수 있습니다. 조건 실패는 충돌과 재시도 정책을 구분해서 처리합니다. [AWS Condition expressions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html)
+**조건부 쓰기로 무엇을 보호하나요?** 예상 version과 일치할 때만 갱신하거나 없는 Item만 생성해 경쟁 쓰기·중복 처리를 제어할 수 있습니다. 조건 실패는 충돌과 재시도 정책을 구분해서 처리합니다. [AWS Condition expressions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html)
 
 ## 한계 / 주의점 및 답변 보완
 
@@ -73,6 +75,8 @@ Streams로 저장소나 캐시를 갱신한다면 중복·최신 version·실패
 이 문서는 선택과 설계 기준이며 실제 AWS 리소스 생성·부하 시험·마이그레이션 결과를 포함하지 않습니다.
 
 ## 관련 문서 / 공식 참고 자료
+
+자료 확인일: 2026-10-08. 제품 기능은 링크된 공식 latest/current 문서 기준이며, 실제 배포의 엔진·클라이언트·프레임워크 버전과 지원 설정을 별도로 확인합니다.
 
 - [다단계 캐시](../caching/multi-level-cache.md), [Offset Replay와 멱등성](../messaging/kafka-offset-replay.md)
 - [AWS DynamoDB 개요](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html), [DynamoDB Streams](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html)
