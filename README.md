@@ -14,6 +14,12 @@
 | Backend / Caching | [Caffeine / Redis와 다단계 캐시](backend/caching/multi-level-cache.md) | L1/L2의 역할과 정합성을 어떻게 설계하는가? |
 | Backend / Resilience | [Redis 장애 복구와 Graceful Degradation](backend/resilience/redis-recovery.md) | 캐시 장애 중 원본을 보호하고 서비스를 어떻게 회복하는가? |
 | Backend / Resilience | [Circuit Breaker와 장애 감지·Slack 알림](backend/resilience/circuit-breaker.md) | 장애를 어떻게 감지하고 서킷 발동 이후 요청 처리와 운영 알림을 연결하는가? |
+| Backend / Database | [DynamoDB와 데이터베이스 선택](backend/database/dynamodb.md) | 접근 패턴과 Key 설계로 DynamoDB, MongoDB, DocumentDB를 어떻게 비교하는가? |
+| Backend / Messaging | [Kafka Partition 수와 Rebalancing](backend/messaging/kafka-partition-rebalancing.md) | 처리량에 맞는 Partition 수와 증설·할당 변경의 영향을 어떻게 판단하는가? |
+| Backend / Messaging | [Kafka Offset Replay와 멱등성](backend/messaging/kafka-offset-replay.md) | 재처리 범위와 중복·이벤트 순서를 어떻게 제어하는가? |
+| Backend / Messaging | [Kafka Schema Registry와 호환성](backend/messaging/kafka-schema-registry.md) | BACKWARD 정책, 배포 순서와 Schema 오류 복구를 어떻게 설명하는가? |
+| Backend / Networking | [Load Balancer와 AWS 종류](backend/networking/load-balancer.md) | 연결·요청·자원 부하를 구분하고 분산 알고리즘과 Health Check를 어떻게 선택하는가? |
+| Backend / Networking | [Route 53과 DNS 라우팅](backend/networking/route53-dns-routing.md) | DNS 분산과 ALB의 차이, 가중치와 장애 전환 지연을 어떻게 설명하는가? |
 
 ## 문서 작성 기준
 

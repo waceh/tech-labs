@@ -195,6 +195,7 @@ Slack 알림은 전달 경로이지 담당자의 확인과 복구 완료를 보�
 
 ## 관련 문서 / 공식 참고 자료
 
+- [Load Balancer와 Health Check](../networking/load-balancer.md): 대상의 정상 여부 판단과 의존성 호출 보호의 차이
 - [Redis 장애 복구와 Graceful Degradation](redis-recovery.md), [Cache Avalanche](../caching/cache-avalanche.md), [Single Flight](../caching/single-flight.md)
 - [Resilience4j CircuitBreaker](https://resilience4j.readme.io/docs/circuitbreaker): 상태·관측·예외 분류
 - [Resilience4j Micrometer](https://resilience4j.readme.io/docs/micrometer): 서킷 메트릭
