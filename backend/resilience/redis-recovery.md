@@ -19,6 +19,27 @@ Graceful Degradation은 핵심 기능과 자원 예산을 보호하며 일부 �
 | Load Shedding | 감당하지 못하는 작업을 빠르게 거절 | 거절 대상과 사용자 응답 정책 필요 |
 | Warm-up | 복구 후 중요한 캐시부터 채움 | foreground와 원본 용량 경쟁 |
 
+### 역할에 따른 SPOF 판단
+
+Redis가 한 대라는 사실만으로 서비스 전체의 [SPOF](spof-high-availability.md) 여부가 결정되지는 않습니다. 재생성 가능한 캐시라면 원본 fallback으로 핵심 기능을 유지할 수 있지만, 대체 용량과 timeout·원본 보호가 검증되어야 합니다. 세션의 유일한 저장소라면 같은 장애가 로그인 유지나 인증 기능 중단으로 이어질 수 있으므로 해당 기능의 대체 경로를 별도로 평가합니다.
+
+### Replication과 Failover
+
+Replication은 데이터를 복제본에 전달하는 것이고 Failover는 장애 시 다른 노드가 Primary 역할을 이어받도록 전환하는 것입니다.
+
+```text
+Primary ── 비동기 복제 ──> Replica
+Primary 장애 → 감지/선출 → Replica 승격 → Client가 새 Primary로 재연결
+```
+
+Redis의 기본 복제는 비동기이므로 승격 시 복제되지 않은 최신 쓰기가 유실될 수 있습니다. Replica가 존재한다는 사실만으로 자동 승격이나 Client 전환이 보장되지 않습니다. [Redis 복제 문서](https://redis.io/docs/latest/operate/oss_and_stack/management/replication/)
+
+- Sentinel은 비Cluster 구성의 감지·선출·Failover를 담당하며 Sentinel 자체의 장애 격리와 선출에 필요한 수, 지원 Client도 확인해야 합니다. [Redis Sentinel](https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/)
+- Redis Cluster는 Primary 간 샤딩과 Replica 복제를 함께 구성할 수 있으며 승격 조건과 Cluster 지원 Client가 필요합니다. [Redis Cluster](https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/)
+- ElastiCache의 노드 기반 Valkey/Redis OSS는 지원 조건에 맞는 Replica·Multi-AZ·자동 Failover 설정을 확인합니다. 이 기능을 일반 노드 기반 Memcached에 적용한다고 설명하지 않습니다. [AWS Multi-AZ](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html)
+
+가용성 회복과 무손실은 다른 목표입니다. 허용 데이터 손실, 이전 Primary의 쓰기, Client 재연결·재시도와 실제 복구 시간을 함께 검증합니다. Replica는 잘못된 삭제도 복제할 수 있으므로 백업을 대체하지 않습니다.
+
 ## 면접 답변 예시
 
 > 재생성 가능한 캐시의 장애에서는 정상 miss와 접근 실패를 구분하고 timeout과 Circuit Breaker로 반복 대기를 줄입니다. 유효한 로컬 캐시를 활용하고 동일 Key 조회는 병합하되, 다른 Key의 원본 fallback은 동시성 한도로 제어해야 합니다. stale 응답이나 기능 축소는 업무상 허용된 범위에서 적용하며 재고·결제·권한은 별도 검증하거나 명시적으로 실패해야 합니다. 복구 후에는 데이터 보존 범위와 hot set의 적중률을 확인하고 Warm-up과 사용자 요청을 전체 원본 예산 안에서 처리합니다. 원본 지연, 풀 대기, API tail latency와 오류율을 확인하며 트래픽 제한을 점진적으로 해제합니다.
@@ -72,6 +93,7 @@ cache-aside에서는 DB 갱신 전 시작한 조회가 무효화 후 오래된 �
 
 ## 관련 문서 / 공식 참고 자료
 
+- [SPOF와 고가용성](spof-high-availability.md): 역할별 장애 영향, 샤딩·복제·Failover의 구분
 - [Circuit Breaker: 장애 감지, 요청 처리와 Slack 알림](circuit-breaker.md)
 - [Cache Avalanche](../caching/cache-avalanche.md), [Caffeine / Redis](../caching/multi-level-cache.md), [Single Flight](../caching/single-flight.md)
 - [Redis persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/)

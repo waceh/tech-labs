@@ -102,6 +102,8 @@ Health Check를 record에 연결하거나 지원되는 Alias에서 `EvaluateTarg
 
 **Q5. Failover 구성만 있으면 재해 복구가 되나요?** 대체 엔드포인트의 데이터 정합성, 용량, 인증·설정과 전환·복귀 절차도 필요합니다. DNS 전환은 전체 복구 설계의 한 요소입니다.
 
+가용성 평가는 [SPOF와 HA 설계](../resilience/spof-high-availability.md)의 장애 범위·공통 의존성·RTO/RPO 기준과 함께 수행합니다. DNS 전환 성공과 사용자 기능 복구 완료는 별도로 측정합니다.
+
 ## 한계 / 주의점 및 답변 보완
 
 DNS의 health 기반 응답도 모든 대상 장애 시 정책별 처리 규칙이 있으므로 “모든 장애 주소를 항상 제외한다”고 단정하지 않습니다. [Failover 정책](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-failover.html)과 record health 동작을 확인합니다. DNS 라우팅은 개별 요청의 과부하 제어를 대신하지 않으며 [LB Health Check](load-balancer.md)와 [Circuit Breaker](../resilience/circuit-breaker.md)의 역할도 별도로 평가합니다.

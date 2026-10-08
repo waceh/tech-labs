@@ -111,6 +111,8 @@ HPA는 metric으로 replica 수를 조절하며 기존 연결이나 요청을 �
 
 ## 한계 / 주의점 및 답변 보완
 
+자체 구축한 단일 LB 프로세스와 대체 진입 경로가 없다면 LB가 [SPOF](../resilience/spof-high-availability.md)일 수 있습니다. 반면 AWS 관리형 LB의 DNS 이름이 하나라는 이유로 물리 LB도 한 대라고 판단하지 않습니다. 활성 AZ의 LB 노드와 Target 배치, 장애 후 잔여 용량을 확인해야 합니다. [ELB 구조](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html)
+
 LB는 모든 downstream 용량을 보장하지 않습니다. 서버 증설이나 더 균등한 분산이 DB/API 포화를 해결하지 못할 수 있으므로 원본 예산과 admission control도 필요합니다. 제품의 알고리즘·health·stickiness·프로토콜 설정을 확인한 뒤 판단합니다.
 
 이 문서는 동작과 설계 기준이며 실제 AWS/Kubernetes 리소스 생성·트래픽 분산 시험 결과가 아닙니다.
